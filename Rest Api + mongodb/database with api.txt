@@ -1,0 +1,264 @@
+Mongodb and mongoose
+
+1) go to mongodb.com
+2) go to mongodb atlas
+3)go for a free
+4)build a cluster
+5)details = https://www.youtube.com/watch?v=WDrU305J1yw&list=PL55RiY5tL51q4D-B63KBnygU6opNPFk_q&index=6
+
+6)install package name mongoose  =  npm install --save mongoose  //for working with database insert , delete , update ....
+
+7)add following in app.js
+
+	- const mongoose = require("mongoose");
+	- copy connection link from mongodb atlas connection 
+	- type password
+			-mongoose.connect("mongodb+srv://rest-api-practice:"+process.env.MONGO_ATLAS_PW +"@rest-api-practice-vgiq6.mongodb.net/test?retryWrites=true");
+			- make nodemon.json
+			-  {
+					"env": {
+						"MONGO_ATLAS_PW": "password of project connection"
+					}
+				}
+				
+8)connection string
+
+mongoose.connect("mongodb+srv://rest-api-practice:"+process.env.MONGO_ATLAS_PW +"@rest-api-practice-vgiq6.mongodb.net/test?retryWrites=true",{
+        useMongoClient : true,
+});
+mongoose.Promise = global.Promise;
+
+9)Working with database
+-create model folder in app folder
+-create file productSchema.js
+		const mongoose = require("mongoose");
+
+const productSchema = mongoose.Schema({
+    _id : mongoose.Schema.Types.ObjectId,
+    name :{ type : String , required : true },
+    price : { type : Number , required : true }  
+})
+module.exports = mongoose.model('Product' , productSchema);
+
+-route folder - product.js
+
+import mogoose model
+const productModel = require("../models/product");
+
+
+make model instance in post method
+router.post('/',(req,res,next)=>{
+
+    //fetch data from application and make instance for db
+    const productDB = new productModel({
+        _id : new mongoose.Types.ObjectId(),
+        name : req.body.name,
+        price : req.body.price
+    });
+
+    //save data in mongoDB
+    productDB.save().then(result => {
+        console.log(result);
+        res.status(200).json({
+            message: "Created product successfully ",
+            createdProduct: {
+                name : result.name,
+                price : result.price,
+                _id : result._id,
+                request:{
+                    type: 'GET',
+                    url: 'http://localhost:3000/products/' + result._id
+                }
+            }
+        });
+    }).catch(error => {
+        console.log(error);
+        res.status(500).json({error : error});
+    });
+    
+});
+
+checking data saved or not  by id
+router.get('/:productId',(req,res,next)=>{
+    const id = req.params.productId;
+    productModel.findById(id)
+        .select("name price _id")
+        .exec()
+        .then(result => {
+            console.log(result);
+
+            //check result is not null or record to this id is there or not
+            if(result){
+                res.status(200).json(result);
+            }else{
+                res.status(404).json({
+                    message : "No valid entry is found for provided ID"
+                });
+            }
+            
+        }).catch(error => {
+            console.log(error);
+
+            res.status(500).json({
+                message : "Invalid product ID",
+                error : error
+            });
+        });
+});
+
+
+see all the data
+router.get('/',(req,res,next)=>{
+
+    productModel.find()
+    .select("name price _id")
+    .exec()
+    .then(result =>{
+        
+        //check reords are empty or not
+        if(result.length >= 0){
+             
+            const response = {
+                count: result.length,
+                products : result.map(doc => {
+                    return{
+                        name : doc.name,
+                        price : doc.price,
+                        _id : doc._id,
+                        request : {
+                            type : 'GET',
+                            url : 'http://localhost:3000/products/' + doc._id
+                        }
+                    }
+                })
+            }
+            res.status(201).json(response);
+        
+        }else{
+            res.status(500).json({
+                message : "No records are available."
+            });
+        }
+        
+    }).catch(error => {
+
+        console.log(error);
+        res.status(500).json({
+            error : error
+        });
+    });
+});
+
+
+delete the record
+router.delete('/:productId',(req,res,next)=>{
+    
+    const id = req.params.productId;
+    
+    productModel.remove({
+        _id : id
+    })
+    .exec()
+    .then(result =>{
+
+        console.log(result);
+       
+        //check result is not null or record to this id is there or not
+        if(result){
+            res.status(200).json({
+                message : "Record is deleted",
+                result : result
+            });
+            
+        }else{
+            res.status(404).json({
+                message : "No valid entry is found for provided ID"
+            });
+        }
+
+    }).catch(error => {
+
+        console.log(error);
+
+        res.status(500).json({
+            message : "Invalid product ID",
+            error : error
+        });
+    });
+});
+
+
+only want to few update records
+
+router.patch('/:productId',(req,res,next)=>{
+    const id = req.params.productId;
+    const updateops = {};
+
+    for(const ops of req.body){
+        updateops[ops.propName] = ops.value;
+        updateops[ops.propPrice] = ops.value;
+    }
+
+    productModel.update({ _id: id }, { $set: updateops })
+    .exec()
+    .then(result =>{
+       
+        //check result is not null or record to this id is there or not
+        if(result){
+            res.status(200).json({
+                message : "Record is updated",
+                updatedRecord : updateops
+            });
+            
+        }else{
+            res.status(404).json({
+                message : "No valid entry is found for provided ID"
+            });
+        }
+
+    }).catch(error => {
+
+        console.log(error);
+
+        res.status(500).json({
+            message : "Invalid product ID",
+            error : error
+        });
+    });
+});
+
+all records update
+
+router.patch('/:productId',(req,res,next)=>{
+    const id = req.params.productId;
+
+    productModel.update({ _id: id }, { $set: {
+	   "name" : req.body.name,
+	   "price" : req.body.price
+	} })
+    .exec()
+    .then(result =>{
+       
+        //check result is not null or record to this id is there or not
+        if(result){
+            res.status(200).json({
+                message : "Record is updated",
+                updatedRecord : updateops
+            });
+            
+        }else{
+            res.status(404).json({
+                message : "No valid entry is found for provided ID"
+            });
+        }
+
+    }).catch(error => {
+
+        console.log(error);
+
+        res.status(500).json({
+            message : "Invalid product ID",
+            error : error
+        });
+    });
+});
